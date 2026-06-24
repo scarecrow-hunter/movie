@@ -1,461 +1,231 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Teater Mirroring - SPA Wireless Screen Mirror</title>
-  <style>
-    :root {
-      color-scheme: dark;
-      font-family: Inter, system-ui, sans-serif;
-      background: #020305;
-      color: #e8f8ff;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bioskop Mirroring</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        /* ================= CSS TEMA BIOSKOP ================= */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+        body {
+            background-color: #0b0c10;
+            color: #c5c6c7;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
 
-    html, body {
-      min-height: 100%;
-      background: radial-gradient(circle at top, rgba(41, 154, 255, 0.14), transparent 30%),
-                  linear-gradient(180deg, #05070d 0%, #020305 100%);
-    }
+        /* Container SPA */
+        .page {
+            display: none; /* Disembunyikan secara default */
+            width: 100%;
+            height: 100vh;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+        }
 
-    body {
-      color: #cdd6f4;
-      line-height: 1.5;
-    }
+        .active {
+            display: flex; /* Ditampilkan saat aktif */
+        }
 
-    .stage {
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 24px;
-    }
+        h1 {
+            color: #66fcf1;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(102, 252, 241, 0.5);
+        }
 
-    .app-shell {
-      width: min(1100px, 100%);
-      background: rgba(10, 16, 30, 0.95);
-      border: 1px solid rgba(108, 189, 255, 0.12);
-      border-radius: 32px;
-      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
-      overflow: hidden;
-    }
+        p { margin-bottom: 20px; color: #a1a1a1; }
 
-    .hero-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 16px;
-      padding: 28px 32px;
-      border-bottom: 1px solid rgba(214, 109, 255, 0.18);
-      background: radial-gradient(circle at top left, rgba(214, 109, 255, 0.18), transparent 30%),
-                  linear-gradient(180deg, rgba(12, 8, 24, 0.96), rgba(5, 2, 16, 0.96));
-      box-shadow: inset 0 0 60px rgba(214, 109, 255, 0.08);
-    }
+        /* Tombol Neon */
+        button {
+            background: transparent;
+            color: #66fcf1;
+            border: 2px solid #66fcf1;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+            box-shadow: 0 0 15px rgba(102, 252, 241, 0.2);
+        }
 
-    .hero-bar h1 {
-      font-size: clamp(2rem, 3vw, 3.4rem);
-      letter-spacing: 0.02em;
-      margin-bottom: 10px;
-      color: #c4f3ff;
-      text-shadow: 0 0 16px rgba(96, 214, 255, 0.28);
-    }
+        button:hover {
+            background: #66fcf1;
+            color: #0b0c10;
+            box-shadow: 0 0 30px rgba(102, 252, 241, 0.6);
+        }
 
-    .hero-bar p {
-      color: #9adcff;
-      max-width: 640px;
-      line-height: 1.7;
-    }
+        /* Pilihan Perangkat (Landing Page) */
+        .device-selector {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
 
-    .panel {
-      display: none;
-      padding: 32px;
-      gap: 24px;
-      display: grid;
-    }
+        /* Efek Layar Bioskop (Receiver Page) */
+        .theater-container {
+            position: relative;
+            width: 85vw;
+            max-width: 1000px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
 
-    .panel.active {
-      display: grid;
-    }
+        video {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background-color: #000;
+            border-radius: 10px;
+            /* Efek Glow Layar */
+            box-shadow: 0 0 50px rgba(102, 252, 241, 0.15), 0 0 100px rgba(255, 255, 255, 0.05);
+            z-index: 2;
+            object-fit: contain;
+        }
 
-    .button-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 24px;
-      margin-top: 24px;
-    }
+        /* Simulasi Pantulan Cahaya Lantai */
+        .floor-reflection {
+            width: 95%;
+            height: 80px;
+            background: linear-gradient(to bottom, rgba(102, 252, 241, 0.1), transparent);
+            filter: blur(15px);
+            transform: perspective(300px) rotateX(60deg);
+            margin-top: -20px;
+            z-index: 1;
+        }
 
-    .glow-button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 140px;
-      border-radius: 28px;
-      border: 1px solid rgba(214, 109, 255, 0.28);
-      background: linear-gradient(180deg, rgba(14, 6, 35, 0.92), rgba(7, 3, 17, 0.92));
-      color: #f5e2ff;
-      font-size: 1.1rem;
-      font-weight: 700;
-      text-align: center;
-      cursor: pointer;
-      transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
-      box-shadow: 0 0 0 1px rgba(214, 109, 255, 0.14);
-      backdrop-filter: blur(8px);
-    }
-
-    .glow-button:hover {
-      transform: translateY(-3px);
-      border-color: rgba(214, 109, 255, 0.55);
-      box-shadow: 0 0 40px rgba(214, 109, 255, 0.28);
-    }
-
-    .glow-button.secondary {
-      background: rgba(14, 8, 30, 0.96);
-      border-color: rgba(214, 109, 255, 0.22);
-      color: #e8d6ff;
-    }
-
-    .status-box,
-    .info-box,
-    .guide-box {
-      padding: 24px;
-      border-radius: 24px;
-      border: 1px solid rgba(214, 109, 255, 0.12);
-      background: rgba(8, 6, 20, 0.88);
-      box-shadow: inset 0 0 0 1px rgba(214, 109, 255, 0.06);
-      backdrop-filter: blur(8px);
-    }
-
-    .status-box strong {
-      color: #7dd3fc;
-    }
-
-    .screen-frame {
-      position: relative;
-      width: 100%;
-      max-width: 1000px;
-      margin: 0 auto;
-      display: grid;
-      place-items: center;
-      padding: 32px 0 0;
-    }
-
-    .screen-container {
-      position: relative;
-      width: 85%;
-      min-height: 320px;
-      margin: 0 auto;
-      border-radius: 34px;
-      background: radial-gradient(circle at top, rgba(214, 109, 255, 0.18), transparent 25%),
-                  linear-gradient(180deg, #11071c 0%, #020305 100%);
-      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.42);
-      overflow: hidden;
-      border: 1px solid rgba(214, 109, 255, 0.16);
-    }
-
-    .screen-container::after {
-      content: '';
-      position: absolute;
-      inset: auto 10% 16px 10%;
-      height: 24px;
-      background: radial-gradient(ellipse at center, rgba(34, 211, 238, 0.24), transparent 60%);
-      filter: blur(16px);
-      transform: translateY(24px);
-      z-index: 0;
-    }
-
-    .screen-video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      border-radius: 28px;
-      background: radial-gradient(circle at center, #020305, #010204);
-      mix-blend-mode: normal;
-      position: relative;
-      z-index: 1;
-    }
-
-    .screen-caption {
-      margin-top: 18px;
-      text-align: center;
-      color: #9fdcff;
-      font-size: 0.97rem;
-    }
-
-    .note {
-      color: #90b9e8;
-      font-size: 0.95rem;
-    }
-
-    .hint {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      margin-top: 18px;
-      padding: 16px 20px;
-      border-radius: 20px;
-      background: rgba(5, 12, 22, 0.96);
-      border: 1px solid rgba(92, 202, 255, 0.16);
-    }
-
-    .hint::before {
-      content: '⚠';
-      color: #5de2ff;
-    }
-
-    .guide-box h2 {
-      margin-bottom: 14px;
-      color: #d6e4ff;
-    }
-
-    .guide-box ol {
-      list-style-position: inside;
-      color: #b8c8e9;
-      margin-left: 14px;
-      padding-left: 0;
-    }
-
-    .guide-box li {
-      margin-bottom: 12px;
-    }
-
-    .footer {
-      margin-top: 24px;
-      padding: 18px 32px;
-      font-size: 0.92rem;
-      color: #8b9bc4;
-      border-top: 1px solid rgba(255, 255, 255, 0.06);
-      background: rgba(4, 8, 16, 0.8);
-      text-align: center;
-    }
-
-    @media (max-width: 760px) {
-      .button-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .hero-bar {
-        flex-direction: column;
-      }
-    }
-  </style>
+        .status { margin-top: 15px; font-style: italic; color: #45a29e; }
+    </style>
 </head>
 <body>
-  <div class="stage">
-    <div class="app-shell">
-      <div class="hero-bar">
-        <div>
-          <h1>Bioskop</h1>
-          <p>Aplikasi layar nirkabel full-stack untuk menampilkan konten HP ke laptop/PC dengan gaya bioskop gelap neon dan nuansa gaming futuristik.</p>
+
+    <div id="landing-page" class="page active">
+        <h1>Tentukan Peran Perangkat Ini</h1>
+        <div class="device-selector">
+            <button onclick="navigateTo('sender-page')">📱 HANDPHONE (Pengirim)</button>
+            <button onclick="navigateTo('receiver-page')">💻 LAPTOP / PC (Penerima)</button>
         </div>
-      </div>
-
-      <main id="app">
-        <section id="landing" class="panel active">
-          <div class="status-box">
-            <strong>Pilih Mode</strong>
-            <p>Pilih apakah perangkat ini akan menjadi pemancar layar (HP) atau layar penerima (laptop/PC) dalam ekosistem bioskop gelap.</p>
-          </div>
-
-          <div class="button-grid">
-            <button id="btnSender" class="glow-button">📱 HP (Pemancar)</button>
-            <button id="btnReceiver" class="glow-button secondary">💻 Laptop / PC (Layar)</button>
-          </div>
-        </section>
-
-        <section id="sender" class="panel">
-          <div class="status-box">
-            <strong>Modus Pemancar</strong>
-            <p>Tekan tombol di bawah untuk mulai mengirimkan layar ponsel. Pastikan browser mendukung <code>getDisplayMedia()</code> dan jalankan lewat HTTPS.</p>
-          </div>
-
-          <button id="startBroadcast" class="glow-button">Mulai Siaran Bioskop</button>
-
-          <div class="hint">Pastikan browser HP mendukung tangkapan layar dan file ini dibuka melalui HTTPS atau hosting, bukan <code>file://</code>.</div>
-
-          <div id="senderStatus" class="note">Status: Menunggu perintah.</div>
-        </section>
-
-        <section id="receiver" class="panel">
-          <div class="status-box">
-            <strong>Modus Bioskop</strong>
-            <p>Sambungkan ke pemancar HP. Setelah terhubung, tampilan akan muncul sebagai layar bioskop gelap.</p>
-          </div>
-
-          <button id="connectReceiver" class="glow-button secondary">Buka Layar Bioskop</button>
-
-          <div class="screen-frame">
-            <div class="screen-container">
-              <video id="remoteVideo" class="screen-video" autoplay playsinline controls muted></video>
-            </div>
-            <div class="screen-caption">Layar bioskop akan tampil di sini setelah sambungan berhasil.</div>
-          </div>
-
-          <div id="receiverStatus" class="note">Status: Menunggu koneksi.</div>
-        </section>
-
-        <section id="guide" class="panel">
-          <div class="guide-box">
-            <h2>Panduan Pasang</h2>
-            <ol>
-              <li>Simpan file ini sebagai <strong>index.html</strong>.</li>
-              <li>Buka melalui <strong>HTTPS</strong> atau hosting, jangan langsung dari <code>file://</code>.</li>
-              <li>Upload ke GitHub dan aktifkan GitHub Pages lewat <code>Settings &gt; Pages</code> pada branch <code>main</code> atau <code>gh-pages</code>.</li>
-              <li>Atau deploy ke Netlify dengan menyeret <code>index.html</code> ke dashboard.</li>
-              <li>Buka URL hasil deploy di HP dan laptop, lalu pilih mode HP pada satu perangkat dan mode Laptop pada perangkat lain.</li>
-            </ol>
-          </div>
-        </section>
-      </main>
-
-      <div class="footer">ID Ruang: <code>teater-mirroring-rahasia-123</code>. Pastikan kedua perangkat menggunakan koneksi HTTPS.</div>
     </div>
-  </div>
 
-  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
-  <script>
-    const roomId = 'teater-mirroring-rahasia-123';
-    const landingPanel = document.getElementById('landing');
-    const senderPanel = document.getElementById('sender');
-    const receiverPanel = document.getElementById('receiver');
-    const guidePanel = document.getElementById('guide');
-    const senderStatus = document.getElementById('senderStatus');
-    const receiverStatus = document.getElementById('receiverStatus');
-    const remoteVideo = document.getElementById('remoteVideo');
+    <div id="sender-page" class="page">
+        <h1>Mode Pengirim</h1>
+        <p>Klik tombol di bawah untuk mulai membagikan layar HP Anda.</p>
+        <button onclick="startScreenShare()">Mulai Siarkan Layar</button>
+        <p id="sender-status" class="status"></p>
+        <button style="border-color: #ff4655; color: #ff4655;" onclick="location.reload()">Kembali</button>
+    </div>
 
-    let peer = null;
-    let localStream = null;
+    <div id="receiver-page" class="page">
+        <h1 style="font-size: 1.5rem; margin-bottom: 10px;">Bioskop Virtual</h1>
+        <button id="connect-btn" onclick="connectToPhone()">Sambungkan ke Layar HP</button>
+        <p id="receiver-status" class="status"></p>
+        
+        <div class="theater-container" style="display: none;" id="theater-ui">
+            <video id="theater-video" autoplay playsinline muted></video>
+            <div class="floor-reflection"></div>
+        </div>
+        <button style="border-color: #ff4655; color: #ff4655; margin-top: 30px;" onclick="location.reload()">Kembali</button>
+    </div>
 
-    document.getElementById('btnSender').addEventListener('click', () => {
-      setPanel('sender');
-      initSenderPeer();
-    });
+    <script>
+        // Room ID statis untuk mempertemukan Sender dan Receiver
+        const STATIC_ROOM_ID = 'teater-mirroring-rahasia-123';
+        let peer = null;
 
-    document.getElementById('btnReceiver').addEventListener('click', () => {
-      setPanel('receiver');
-      initReceiverPeer();
-    });
-
-    document.getElementById('startBroadcast').addEventListener('click', startBroadcast);
-    document.getElementById('connectReceiver').addEventListener('click', connectReceiver);
-
-    function setPanel(panelId) {
-      [landingPanel, senderPanel, receiverPanel, guidePanel].forEach(panel => panel.classList.remove('active'));
-      document.getElementById(panelId).classList.add('active');
-    }
-
-    function updateStatus(element, message) {
-      element.textContent = 'Status: ' + message;
-    }
-
-    function initSenderPeer() {
-      if (peer) return;
-      updateStatus(senderStatus, 'Membuat host PeerJS...');
-      peer = new Peer(roomId, {
-        host: '0.peerjs.com',
-        port: 443,
-        path: '/',
-        secure: true
-      });
-
-      peer.on('open', id => {
-        updateStatus(senderStatus, 'Host aktif dengan room ID: ' + id + '. Siapkan layar untuk dibagikan.');
-      });
-
-      peer.on('call', call => {
-        // Saat ada panggilan masuk dari penerima, jawab dengan stream layar yang sudah ditangkap.
-        if (localStream) {
-          call.answer(localStream);
-          updateStatus(senderStatus, 'Menjawab panggilan. Streaming layar aktif.');
-        } else {
-          call.answer(new MediaStream());
-          updateStatus(senderStatus, 'Menjawab panggilan tanpa stream; silakan klik Mulai Siarkan Layar terlebih dahulu.');
+        // Fungsi Navigasi SPA sederhana
+        function navigateTo(pageId) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
         }
-      });
 
-      peer.on('error', err => {
-        updateStatus(senderStatus, 'Kesalahan PeerJS: ' + err);
-        console.error(err);
-      });
-    }
+        // ================= LOGIKA PENGIRIM (HP) =================
+        async function startScreenShare() {
+            const statusText = document.getElementById('sender-status');
+            
+            try {
+                // 1. Meminta izin menangkap layar (Tergantung dukungan browser HP)
+                const stream = await navigator.mediaDevices.getDisplayMedia({ 
+                    video: { cursor: "always" }, 
+                    audio: true 
+                });
 
-    async function startBroadcast() {
-      try {
-        updateStatus(senderStatus, 'Meminta akses layar...');
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-        localStream = stream;
-        updateStatus(senderStatus, 'Layar ditangkap. Menunggu koneksi dari bioskop...');
+                statusText.innerText = "Layar berhasil ditangkap! Menyiapkan server...";
 
-        // Pastikan pemanggilan receiver bisa dijawab saat koneksi masuk.
-        if (peer) {
-          peer.on('call', call => {
-            call.answer(localStream);
-            updateStatus(senderStatus, 'Menjawab panggilan dengan stream layar. Bioskop gelap aktif.');
-          });
+                // 2. Inisialisasi PeerJS sebagai HOST dengan ID Statis
+                peer = new Peer(STATIC_ROOM_ID);
+
+                peer.on('open', (id) => {
+                    statusText.innerText = `Menyiarkan... Menunggu Laptop terhubung.`;
+                });
+
+                // 3. Jika ada Laptop yang menelepon, jawab dengan stream layar kita
+                peer.on('call', (call) => {
+                    call.answer(stream);
+                    statusText.innerText = "Laptop terhubung! Layar sedang disiarkan.";
+                });
+
+                // Jika pengguna menghentikan share screen bawaan browser
+                stream.getVideoTracks()[0].onended = () => {
+                    statusText.innerText = "Siaran layar dihentikan.";
+                };
+
+            } catch (err) {
+                console.error("Gagal menangkap layar:", err);
+                statusText.innerText = `Gagal: ${err.message}. (Browser HP mungkin tidak mendukung ini)`;
+            }
         }
-      } catch (error) {
-        updateStatus(senderStatus, 'Gagal mengambil layar: ' + error.message);
-        console.error(error);
-      }
-    }
 
-    function initReceiverPeer() {
-      if (peer) return;
-      updateStatus(receiverStatus, 'Menginisialisasi koneksi PeerJS...');
-      peer = new Peer({
-        host: '0.peerjs.com',
-        port: 443,
-        path: '/',
-        secure: true
-      });
+        // ================= LOGIKA PENERIMA (LAPTOP) =================
+        function connectToPhone() {
+            const statusText = document.getElementById('receiver-status');
+            const connectBtn = document.getElementById('connect-btn');
+            
+            statusText.innerText = "Menghubungkan ke HP...";
 
-      peer.on('open', id => {
-        updateStatus(receiverStatus, 'Peer penerima aktif. Siap masuk ke bioskop.');
-      });
+            // 1. Inisialisasi PeerJS dengan ID acak (karena dia tamu)
+            peer = new Peer();
 
-      peer.on('error', err => {
-        updateStatus(receiverStatus, 'PeerJS error: ' + err);
-        console.error(err);
-      });
-    }
+            peer.on('open', () => {
+                // 2. Lakukan panggilan WebRTC ke ID Statis milik HP
+                const call = peer.call(STATIC_ROOM_ID, null); // null karena kita tidak mengirim stream balik
 
-    function connectReceiver() {
-      if (!peer) {
-        updateStatus(receiverStatus, 'Peer belum disiapkan. Muat ulang halaman jika perlu.');
-        return;
-      }
+                if (!call) {
+                    statusText.innerText = "Gagal memanggil. Pastikan HP sudah 'Mulai Siarkan Layar' duluan.";
+                    return;
+                }
 
-      updateStatus(receiverStatus, 'Mencoba tersambung ke HP...');
-      const dummyStream = new MediaStream();
-      const call = peer.call(roomId, dummyStream);
+                // 3. Menerima stream layar dari HP
+                call.on('stream', (remoteStream) => {
+                    statusText.innerText = "";
+                    connectBtn.style.display = "none"; // Sembunyikan tombol connect
+                    document.getElementById('theater-ui').style.display = "flex"; // Tampilkan bioskop
+                    
+                    const videoElem = document.getElementById('theater-video');
+                    videoElem.srcObject = remoteStream;
+                });
+            });
 
-      if (!call) {
-        updateStatus(receiverStatus, 'Gagal membuat panggilan WebRTC. Pastikan HP sudah pada mode Pengirim.');
-        return;
-      }
-
-      call.on('stream', stream => {
-        // Tampilkan stream yang diterima dari HP pada elemen video.
-        remoteVideo.srcObject = stream;
-        remoteVideo.play().catch(() => {
-          // Browser mungkin meminta interaksi pengguna sebelum auto-play.
-        });
-        updateStatus(receiverStatus, 'Koneksi terhubung. Layar HP ditampilkan di bioskop.');
-      });
-
-      call.on('error', err => {
-        updateStatus(receiverStatus, 'Error pada panggilan: ' + err);
-        console.error(err);
-      });
-
-      call.on('close', () => {
-        updateStatus(receiverStatus, 'Panggilan ditutup. Coba sambungkan ulang.');
-      });
-    }
-  </script>
+            peer.on('error', (err) => {
+                console.error(err);
+                statusText.innerText = "Error: Pastikan HP sudah menyiarkan layar terlebih dahulu.";
+            });
+        }
+    </script>
 </body>
 </html>
