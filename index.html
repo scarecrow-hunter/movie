@@ -144,88 +144,137 @@
     </div>
 
     <script>
-        // Room ID statis untuk mempertemukan Sender dan Receiver
-        const STATIC_ROOM_ID = 'teater-mirroring-rahasia-123';
-        let peer = null;
+       // ================= CONFIGURATION & GLOBAL VARIABLES =================
+// Room ID statis untuk mempertemukan Sender (HP) dan Receiver (Laptop)
+const STATIC_ROOM_ID = 'teater-mirroring-rahasia-123';
+let peer = null;
 
-        // Fungsi Navigasi SPA sederhana
-        function navigateTo(pageId) {
-            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-            document.getElementById(pageId).classList.add('active');
+// ================= NAVIGASI SPA & DETEKSI =================
+// Fungsi Navigasi halaman tunggal (SPA)
+function navigateTo(pageId) {
+    document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+    document.getElementById(pageId).classList.add('active');
+    
+    // Pemicu otomatis: Jika masuk ke mode HP (Sender), langsung cek dukungan browser
+    if (pageId === 'sender-page') {
+        checkDeviceSupport();
+    }
+}
+
+// Fungsi Mendeteksi apakah HP Klien mendukung fitur perekaman layar web
+function checkDeviceSupport() {
+    const statusText = document.getElementById('sender-status');
+    const startBtn = document.getElementById('start-share-btn');
+
+    // 1. Cek apakah browser mendukung API Media
+    if (!navigator.mediaDevices) {
+        statusText.innerText = "❌ Browser Anda tidak mendukung WebRTC. Gunakan Chrome/Safari versi terbaru.";
+        statusText.style.color = "#ff4655";
+        if(startBtn) {
+            startBtn.disabled = true;
+            startBtn.style.opacity = "0.5";
+        }
+        return;
+    }
+
+    // 2. Cek apakah browser mendukung Capture Layar (getDisplayMedia)
+    if (!navigator.mediaDevices.getDisplayMedia) {
+        statusText.innerText = "⚠️ Browser HP ini tidak mendukung rekam layar web. Sangat disarankan pakai Google Chrome di Android.";
+        statusText.style.color = "#ffbb33"; // Warna kuning peringatan
+        if(startBtn) {
+            startBtn.disabled = true;
+            startBtn.style.opacity = "0.5";
+        }
+    } else {
+        statusText.innerText = "✅ HP didukung! Siap menyiarkan layar ke bioskop.";
+        statusText.style.color = "#66fcf1";
+        if(startBtn) {
+            startBtn.disabled = false;
+            startBtn.style.opacity = "1";
+        }
+    }
+}
+
+// ================= LOGIKA PENGIRIM (HP / SENDER) =================
+async function startScreenShare() {
+    const statusText = document.getElementById('sender-status');
+    
+    try {
+        statusText.innerText = "Membuka sistem perekaman layar...";
+        statusText.style.color = "#66fcf1";
+
+        // 1. Meminta izin menangkap layar bawaan OS
+        const stream = await navigator.mediaDevices.getDisplayMedia({ 
+            video: { cursor: "always" }, 
+            audio: true 
+        });
+
+        statusText.innerText = "Layar berhasil ditangkap! Menghubungkan ke server PeerJS...";
+
+        // 2. Inisialisasi PeerJS sebagai HOST menggunakan ID Statis
+        peer = new Peer(STATIC_ROOM_ID);
+
+        peer.on('open', (id) => {
+            statusText.innerText = `Menyiarkan... Silakan klik 'Sambungkan' di Laptop Anda.`;
+        });
+
+        // 3. Menjawab panggilan masuk dari Laptop dengan mengirimkan stream layar HP
+        peer.on('call', (call) => {
+            call.answer(stream);
+            statusText.innerText = "🍿 Bioskop Terhubung! Layar HP sedang tayang di Laptop.";
+        });
+
+        // Antisipasi jika pengguna mematikan share screen lewat panel bawaan HP
+        stream.getVideoTracks()[0].onended = () => {
+            statusText.innerText = "Siaran layar telah dihentikan oleh pengguna.";
+            statusText.style.color = "#ff4655";
+        };
+
+    } catch (err) {
+        console.error("Gagal menangkap layar:", err);
+        statusText.style.color = "#ff4655";
+        statusText.innerText = `Gagal menyiarkan: ${err.message}`;
+    }
+}
+
+// ================= LOGIKA PENERIMA (LAPTOP / RECEIVER) =================
+function connectToPhone() {
+    const statusText = document.getElementById('receiver-status');
+    const connectBtn = document.getElementById('connect-btn');
+    
+    statusText.innerText = "Mencari sinyal dari HP...";
+    statusText.style.color = "#66fcf1";
+
+    // 1. Inisialisasi PeerJS Laptop dengan ID acak
+    peer = new Peer();
+
+    peer.on('open', () => {
+        // 2. Menghubungi ID Statis milik HP
+        const call = peer.call(STATIC_ROOM_ID, null);
+
+        if (!call) {
+            statusText.innerText = "Gagal terhubung. Pastikan HP sudah menekan 'Mulai Siarkan Layar' terlebih dahulu.";
+            statusText.style.color = "#ff4655";
+            return;
         }
 
-        // ================= LOGIKA PENGIRIM (HP) =================
-        async function startScreenShare() {
-            const statusText = document.getElementById('sender-status');
+        // 3. Menerima kiriman video dari HP dan memasukkannya ke layar bioskop HTML5
+        call.on('stream', (remoteStream) => {
+            statusText.innerText = "";
+            connectBtn.style.display = "none"; // Sembunyikan tombol connect agar sinematik
+            document.getElementById('theater-ui').style.display = "flex"; // Munculkan layar bioskop
             
-            try {
-                // 1. Meminta izin menangkap layar (Tergantung dukungan browser HP)
-                const stream = await navigator.mediaDevices.getDisplayMedia({ 
-                    video: { cursor: "always" }, 
-                    audio: true 
-                });
+            const videoElem = document.getElementById('theater-video');
+            videoElem.srcObject = remoteStream;
+        });
+    });
 
-                statusText.innerText = "Layar berhasil ditangkap! Menyiapkan server...";
-
-                // 2. Inisialisasi PeerJS sebagai HOST dengan ID Statis
-                peer = new Peer(STATIC_ROOM_ID);
-
-                peer.on('open', (id) => {
-                    statusText.innerText = `Menyiarkan... Menunggu Laptop terhubung.`;
-                });
-
-                // 3. Jika ada Laptop yang menelepon, jawab dengan stream layar kita
-                peer.on('call', (call) => {
-                    call.answer(stream);
-                    statusText.innerText = "Laptop terhubung! Layar sedang disiarkan.";
-                });
-
-                // Jika pengguna menghentikan share screen bawaan browser
-                stream.getVideoTracks()[0].onended = () => {
-                    statusText.innerText = "Siaran layar dihentikan.";
-                };
-
-            } catch (err) {
-                console.error("Gagal menangkap layar:", err);
-                statusText.innerText = `Gagal: ${err.message}. (Browser HP mungkin tidak mendukung ini)`;
-            }
-        }
-
-        // ================= LOGIKA PENERIMA (LAPTOP) =================
-        function connectToPhone() {
-            const statusText = document.getElementById('receiver-status');
-            const connectBtn = document.getElementById('connect-btn');
-            
-            statusText.innerText = "Menghubungkan ke HP...";
-
-            // 1. Inisialisasi PeerJS dengan ID acak (karena dia tamu)
-            peer = new Peer();
-
-            peer.on('open', () => {
-                // 2. Lakukan panggilan WebRTC ke ID Statis milik HP
-                const call = peer.call(STATIC_ROOM_ID, null); // null karena kita tidak mengirim stream balik
-
-                if (!call) {
-                    statusText.innerText = "Gagal memanggil. Pastikan HP sudah 'Mulai Siarkan Layar' duluan.";
-                    return;
-                }
-
-                // 3. Menerima stream layar dari HP
-                call.on('stream', (remoteStream) => {
-                    statusText.innerText = "";
-                    connectBtn.style.display = "none"; // Sembunyikan tombol connect
-                    document.getElementById('theater-ui').style.display = "flex"; // Tampilkan bioskop
-                    
-                    const videoElem = document.getElementById('theater-video');
-                    videoElem.srcObject = remoteStream;
-                });
-            });
-
-            peer.on('error', (err) => {
-                console.error(err);
-                statusText.innerText = "Error: Pastikan HP sudah menyiarkan layar terlebih dahulu.";
-            });
-        }
+    peer.on('error', (err) => {
+        console.error(err);
+        statusText.style.color = "#ff4655";
+        statusText.innerText = "Koneksi Gagal. Pastikan HP sudah dalam posisi menyiarkan layar.";
+    });
+}
     </script>
 </body>
 </html>
